@@ -258,4 +258,6 @@ def main():
     print(fullPath)
     print(" + total Cost = " + str(cost))
 
-main()
+
+if __name__ == "__main__":
+    main()
