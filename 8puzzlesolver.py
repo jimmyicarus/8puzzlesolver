@@ -2,9 +2,8 @@ import heapq
 
 GOAL = [1, 2, 3, 4, 5, 6, 7, 8, 0]
 
-# ─────────────────────────────────────────
 # Node
-# ─────────────────────────────────────────
+
 class Node:
     state = None
     parentstate = None
@@ -22,9 +21,8 @@ class Node:
         return False
 
 
-# ─────────────────────────────────────────
 # Helpers
-# ─────────────────────────────────────────
+
 def get_neighbors(state):
     """Return list of (action, new_state) reachable from state."""
     neighbors = []
@@ -64,13 +62,15 @@ def reconstruct(node_map, state_key, start_key):
     return actions, states
 
 
-# ─────────────────────────────────────────
 # Heuristics
-# ─────────────────────────────────────────
+
+## Default heuristic for when g is only considered
+def h_nil(state):
+    return 0
+
 def h_misplaced(state):
     """h1 – number of misplaced tiles (excluding blank)."""
     return sum(s != g and s != 0 for s, g in zip(state, GOAL))
-
 
 def h_manhattan(state):
     """h2 – Manhattan distance."""
@@ -81,7 +81,6 @@ def h_manhattan(state):
         goal_i = GOAL.index(tile)
         total += abs(i // 3 - goal_i // 3) + abs(i % 3 - goal_i % 3)
     return total
-
 
 def h_linear_conflict(state):
     """h3 – Manhattan distance + linear conflict (dominates h2)."""
@@ -129,16 +128,18 @@ def h_linear_conflict(state):
     return dist + conflict
 
 
-# ─────────────────────────────────────────
 # Generic priority-queue search
-# ─────────────────────────────────────────
-def _search(start, end, priority_fn):
+
+def _search(start, end, h, g_flag):
     """
-    priority_fn(g, state) → priority value placed on the heap.
+    priority_fn(g, state) -> priority value placed on the heap.
     Returns (path, fullPath, totalCost).
     """
+    
     start_key = tuple(start)
     goal_key  = tuple(end)
+
+    priority_fn = lambda g, s: (g if g_flag else 0) + h(s)
 
     # node_map stores the best known info for each visited state
     node_map = {start_key: {'parent': None, 'action': None, 'state': start, 'g': 0}}
@@ -183,20 +184,19 @@ def _search(start, end, priority_fn):
                 child = Node(new_state)
                 child.state = new_state
                 child.gOfN  = new_g
-                child.hOfN  = h_manhattan(new_state)
+                child.hOfN  = h(new_state)
                 priority = priority_fn(new_g, new_state)
                 heapq.heappush(heap, (priority, child))
 
     return [], [], -1          # no solution found
 
 
-# ─────────────────────────────────────────
 # SearchAlgorithms class
-# ─────────────────────────────────────────
 class SearchAlgorithms:
     Path     = []
     fullPath = []
     totalCost = -1
+    chosen_h = h_linear_conflict
 
     def __init__(self, start, end):
         self.start = start
@@ -205,8 +205,7 @@ class SearchAlgorithms:
     def UCS(self):
         """Uniform Cost Search — f(n) = g(n)."""
         path, fullPath, cost = _search(
-            self.start, self.end,
-            priority_fn=lambda g, s: g
+            self.start, self.end, h_nil, True
         )
         self.Path      = path
         self.fullPath  = fullPath
@@ -216,8 +215,7 @@ class SearchAlgorithms:
     def Astar(self):
         """A* Search — f(n) = g(n) + h(n)  [using Manhattan distance h2]."""
         path, fullPath, cost = _search(
-            self.start, self.end,
-            priority_fn=lambda g, s: g + h_manhattan(s)
+            self.start, self.end, SearchAlgorithms.chosen_h, True
         )
         self.Path      = path
         self.fullPath  = fullPath
@@ -227,8 +225,7 @@ class SearchAlgorithms:
     def Greedy(self):
         """Greedy Best-First Search — f(n) = h(n)  [using Manhattan distance h2]."""
         path, fullPath, cost = _search(
-            self.start, self.end,
-            priority_fn=lambda g, s: h_manhattan(s)
+            self.start, self.end, SearchAlgorithms.chosen_h, False
         )
         self.Path      = path
         self.fullPath  = fullPath
@@ -236,9 +233,7 @@ class SearchAlgorithms:
         return self.Path, self.fullPath, self.totalCost
 
 
-# ─────────────────────────────────────────
-# main  (DO NOT MODIFY — provided by instructor)
-# ─────────────────────────────────────────
+# main
 def main():
     s3 = SearchAlgorithms([1, 2, 3, 4, 0, 6, 7, 5, 8], [1,2,3,4,5,6,7,8,0])
     path, fullPath, cost = s3.UCS()

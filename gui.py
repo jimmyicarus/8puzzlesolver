@@ -326,7 +326,7 @@ class PuzzleGUI:
             self._log(f"    Cost:   {cost}")
             self._log(f"    Moves:  {len(path)}")
             self._log(f"    Time:   {elapsed*1000:.2f} ms")
-            self._log(f"    Path:   {' -> '.join(path[:8])}")
+            self._log(f"    Path:   {' -> '.join(path[:7])}")
             if len(path) > 8:
                 self._log(f"            ... ({len(path)} total moves)")
             self._log("")
