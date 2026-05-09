@@ -32,7 +32,7 @@ COLOR_HEADER_BG = "#ffffff"
 class PuzzleGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("8-Puzzle Solver — A*, UCS, Greedy")
+        self.root.title("8-Puzzle Solver A*, UCS, Greedy, BFS, DFS")
         self.root.configure(bg=COLOR_BG)
         self.root.resizable(False, False)
 
@@ -102,9 +102,9 @@ class PuzzleGUI:
 
         self.heur_vars = {}
         heuristics = [
-            ("h1 — Misplaced Tiles", "h1", "#FF9800"),
-            ("h2 — Manhattan Distance", "h2", COLOR_ACCENT),
-            ("h3 — Linear Conflict", "h3", COLOR_TILE),
+            ("h1 Misplaced Tiles", "h1", "#FF9800"),
+            ("h2 Manhattan Distance", "h2", COLOR_ACCENT),
+            ("h3 Linear Conflict", "h3", COLOR_TILE),
         ]
         for i, (label, key, color) in enumerate(heuristics):
             tk.Label(right_frame, text=label, font=FONT_LABEL, bg=COLOR_BG).grid(
@@ -132,6 +132,8 @@ class PuzzleGUI:
             ("A* Search", self._solve_astar, "#4CAF50"),
             ("UCS", self._solve_ucs, "#2196F3"),
             ("Greedy BFS", self._solve_greedy, "#FF5722"),
+            ("BFS", self._solve_bfs, "#00897B"),
+            ("DFS", self._solve_dfs, "#795548"),
         ]
         for i, (name, cmd, color) in enumerate(algorithms):
             btn = tk.Button(
@@ -140,25 +142,35 @@ class PuzzleGUI:
             )
             btn.grid(row=8 + i, column=0, columnspan=2, pady=3, sticky="ew")
 
+        # --- DFS depth limit ---
+        dfs_frame = tk.Frame(right_frame, bg=COLOR_BG)
+        dfs_frame.grid(row=8 + len(algorithms), column=0, columnspan=2, sticky="ew", pady=(4, 0))
+        tk.Label(dfs_frame, text="DFS depth limit:", font=FONT_SMALL, bg=COLOR_BG).pack(side="left")
+        self.dfs_depth_var = tk.IntVar(value=50)
+        tk.Spinbox(
+            dfs_frame, from_=1, to=200, width=5, textvariable=self.dfs_depth_var,
+            font=FONT_SMALL
+        ).pack(side="left", padx=4)
+
         # --- Results ---
         sep2 = ttk.Separator(right_frame, orient="horizontal")
-        sep2.grid(row=12, column=0, columnspan=2, sticky="ew", pady=12)
+        sep2.grid(row=14, column=0, columnspan=2, sticky="ew", pady=12)
 
         results_label = tk.Label(right_frame, text="Results", font=FONT_HEADER, bg=COLOR_BG)
-        results_label.grid(row=13, column=0, columnspan=2, sticky="w", pady=(0, 4))
+        results_label.grid(row=15, column=0, columnspan=2, sticky="w", pady=(0, 4))
 
         self.result_text = tk.Text(
-            right_frame, width=36, height=12, font=("Consolas", 9),
+            right_frame, width=36, height=14, font=("Consolas", 9),
             bg="#ffffff", relief="solid", borderwidth=1, wrap="word"
         )
-        self.result_text.grid(row=14, column=0, columnspan=2, sticky="ew")
+        self.result_text.grid(row=16, column=0, columnspan=2, sticky="ew")
 
         # --- Benchmark Button ---
         self.btn_benchmark = tk.Button(
             right_frame, text="Run Benchmark (all algorithms)", font=FONT_LABEL,
             command=self._benchmark, bg="#9C27B0", fg="white", relief="flat", cursor="hand2"
         )
-        self.btn_benchmark.grid(row=15, column=0, columnspan=2, pady=(10, 0), sticky="ew")
+        self.btn_benchmark.grid(row=17, column=0, columnspan=2, pady=(10, 0), sticky="ew")
 
     def _draw_board(self):
         self.canvas.delete("all")
@@ -254,7 +266,13 @@ class PuzzleGUI:
     def _solve_greedy(self):
         self._run_solver("Greedy BFS", "Greedy")
 
-    def _run_solver(self, name, method):
+    def _solve_bfs(self):
+        self._run_solver("BFS", "BFS")
+
+    def _solve_dfs(self):
+        self._run_solver("DFS", "DFS", method_args=(self.dfs_depth_var.get(),))
+
+    def _run_solver(self, name, method, method_args=()):
         if self.solving:
             return
         if self.state == GOAL:
@@ -269,11 +287,13 @@ class PuzzleGUI:
         s = solver.SearchAlgorithms(start_state, GOAL)
 
         t0 = time.perf_counter()
-        path, full_path, cost = getattr(s, method)()
+        path, full_path, cost = getattr(s, method)(*method_args)
         elapsed = time.perf_counter() - t0
 
         if cost == -1:
             self._log("No solution found!")
+            if method == "DFS":
+                self._log("Try increasing the DFS depth limit.")
             self.solving = False
             return
 
@@ -307,28 +327,40 @@ class PuzzleGUI:
         self.solving = True
         self._clear_log()
         self._log("=" * 36)
-        self._log("  BENCHMARK — Current Puzzle State")
+        self._log("  BENCHMARK Current Puzzle State")
         self._log("=" * 36)
         self._log("")
 
         start_state = self.state[:]
 
+        dfs_limit = self.dfs_depth_var.get()
         results = []
-        for name, method in [("A* (Manhattan)", "Astar"), ("UCS", "UCS"), ("Greedy (Manhattan)", "Greedy")]:
+        algos = [
+            ("A* (Manhattan)",      "Astar",  ()),
+            ("UCS",                 "UCS",    ()),
+            ("Greedy (Manhattan)",  "Greedy", ()),
+            ("BFS",                 "BFS",    ()),
+            (f"DFS (limit={dfs_limit})", "DFS", (dfs_limit,)),
+        ]
+        for name, method, args in algos:
             s = solver.SearchAlgorithms(start_state[:], GOAL)
             t0 = time.perf_counter()
-            path, full_path, cost = getattr(s, method)()
+            path, full_path, cost = getattr(s, method)(*args)
             elapsed = time.perf_counter() - t0
             results.append((name, path, full_path, cost, elapsed))
 
         for name, path, full_path, cost, elapsed in results:
             self._log(f"  {name}")
-            self._log(f"    Cost:   {cost}")
-            self._log(f"    Moves:  {len(path)}")
-            self._log(f"    Time:   {elapsed*1000:.2f} ms")
-            self._log(f"    Path:   {' -> '.join(path[:7])}")
-            if len(path) > 8:
-                self._log(f"            ... ({len(path)} total moves)")
+            if cost == -1:
+                self._log(f"    No solution found within limits.")
+                self._log(f"    Time:   {elapsed*1000:.2f} ms")
+            else:
+                self._log(f"    Cost:   {cost}")
+                self._log(f"    Moves:  {len(path)}")
+                self._log(f"    Time:   {elapsed*1000:.2f} ms")
+                self._log(f"    Path:   {' -> '.join(path[:7])}")
+                if len(path) > 8:
+                    self._log(f"            ... ({len(path)} total moves)")
             self._log("")
 
         self._log("-" * 36)

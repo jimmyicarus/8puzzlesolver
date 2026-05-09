@@ -1,4 +1,5 @@
 import heapq
+from collections import deque
 
 GOAL = [1, 2, 3, 4, 5, 6, 7, 8, 0]
 
@@ -191,6 +192,82 @@ def _search(start, end, h, g_flag):
     return [], [], -1          # no solution found
 
 
+# Uninformed search: BFS (FIFO queue) and DFS (LIFO stack)
+
+def _bfs(start, end):
+    """Breadth-First Search explores shallowest nodes first using a FIFO queue."""
+    start_key = tuple(start)
+    goal_key  = tuple(end)
+
+    if start_key == goal_key:
+        return [], [start], 0
+
+    node_map = {start_key: {'parent': None, 'action': None, 'state': start, 'g': 0}}
+    queue   = deque([start])
+    visited = {start_key}
+
+    while queue:
+        current = queue.popleft()
+        state_key = tuple(current)
+
+        for action, new_state in get_neighbors(current):
+            new_key = tuple(new_state)
+            if new_key in visited:
+                continue
+            visited.add(new_key)
+            node_map[new_key] = {
+                'parent': state_key,
+                'action': action,
+                'state':  new_state,
+                'g':      node_map[state_key]['g'] + 1,
+            }
+            if new_key == goal_key:
+                path, full_path = reconstruct(node_map, new_key, start_key)
+                return path, full_path, node_map[new_key]['g']
+            queue.append(new_state)
+
+    return [], [], -1
+
+
+def _dfs(start, end, depth_limit=50):
+    start_key = tuple(start)
+    goal_key  = tuple(end)
+
+    if start_key == goal_key:
+        return [], [start], 0
+
+    node_map = {start_key: {'parent': None, 'action': None, 'state': start, 'g': 0}}
+    # stack entries: (state, depth)
+    stack   = [(start, 0)]
+    visited = {start_key}
+
+    while stack:
+        current, depth = stack.pop()
+        state_key = tuple(current)
+
+        if state_key == goal_key:
+            path, full_path = reconstruct(node_map, state_key, start_key)
+            return path, full_path, node_map[state_key]['g']
+
+        if depth >= depth_limit:
+            continue
+
+        for action, new_state in get_neighbors(current):
+            new_key = tuple(new_state)
+            if new_key in visited:
+                continue
+            visited.add(new_key)
+            node_map[new_key] = {
+                'parent': state_key,
+                'action': action,
+                'state':  new_state,
+                'g':      node_map[state_key]['g'] + 1,
+            }
+            stack.append((new_state, depth + 1))
+
+    return [], [], -1
+
+
 # SearchAlgorithms class
 class SearchAlgorithms:
     Path     = []
@@ -203,7 +280,7 @@ class SearchAlgorithms:
         self.end   = end
 
     def UCS(self):
-        """Uniform Cost Search — f(n) = g(n)."""
+        """Uniform Cost Search f(n) = g(n)."""
         path, fullPath, cost = _search(
             self.start, self.end, h_nil, True
         )
@@ -213,7 +290,7 @@ class SearchAlgorithms:
         return self.Path, self.fullPath, self.totalCost
 
     def Astar(self):
-        """A* Search — f(n) = g(n) + h(n)  [using Manhattan distance h2]."""
+        """A* Search f(n) = g(n) + h(n)  [using Manhattan distance h2]."""
         path, fullPath, cost = _search(
             self.start, self.end, SearchAlgorithms.chosen_h, True
         )
@@ -223,10 +300,26 @@ class SearchAlgorithms:
         return self.Path, self.fullPath, self.totalCost
 
     def Greedy(self):
-        """Greedy Best-First Search — f(n) = h(n)  [using Manhattan distance h2]."""
+        """Greedy Best-First Search f(n) = h(n)  [using Manhattan distance h2]."""
         path, fullPath, cost = _search(
             self.start, self.end, SearchAlgorithms.chosen_h, False
         )
+        self.Path      = path
+        self.fullPath  = fullPath
+        self.totalCost = cost
+        return self.Path, self.fullPath, self.totalCost
+
+    def BFS(self):
+        """Breadth-First Search uninformed, FIFO queue, optimal in step count."""
+        path, fullPath, cost = _bfs(self.start, self.end)
+        self.Path      = path
+        self.fullPath  = fullPath
+        self.totalCost = cost
+        return self.Path, self.fullPath, self.totalCost
+
+    def DFS(self, depth_limit=50):
+        """Depth-First Search uninformed, LIFO stack, depth-limited."""
+        path, fullPath, cost = _dfs(self.start, self.end, depth_limit)
         self.Path      = path
         self.fullPath  = fullPath
         self.totalCost = cost
@@ -250,6 +343,18 @@ def main():
     s4 = SearchAlgorithms([1, 2, 3, 4, 0, 6, 7, 5, 8], [1,2,3,4,5,6,7,8,0])
     path, fullPath, cost = s4.Greedy()
     print('GreedyHeuristic Path: ' + str(path), end='\nFull Path is: ')
+    print(fullPath)
+    print(" + total Cost = " + str(cost))
+
+    s5 = SearchAlgorithms([1, 2, 3, 4, 0, 6, 7, 5, 8], [1,2,3,4,5,6,7,8,0])
+    path, fullPath, cost = s5.BFS()
+    print('BFS Path: ' + str(path), end='\nFull Path is: ')
+    print(fullPath)
+    print(" + total Cost = " + str(cost))
+
+    s6 = SearchAlgorithms([1, 2, 3, 4, 0, 6, 7, 5, 8], [1,2,3,4,5,6,7,8,0])
+    path, fullPath, cost = s6.DFS()
+    print('DFS Path: ' + str(path), end='\nFull Path is: ')
     print(fullPath)
     print(" + total Cost = " + str(cost))
 
